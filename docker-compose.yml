@@ -1,0 +1,36 @@
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: seaweedfs
+    ports:
+      - "8333:8333" # S3 Endpoint
+      - "9333:9333" # Master UI
+      - "9340:9340" # Volume Server
+      - "8000:8000" # Filer UI
+      - "7333:7333" # WebDAV
+      - "23646:23646" # Admin UI
+    environment:
+      - IP_BIND=0.0.0.0
+
+      # Authentication
+      - AWS_ACCESS_KEY_ID=any
+      - AWS_SECRET_ACCESS_KEY=any
+    volumes:
+      - ./data/seaweedfs:/data # /data by default
+    networks:
+      - datatrace-analysis-net
+    entrypoint: weed
+    command: mini 
+
+  # duckdb:
+  #   image: duckdb/duckdb:latest
+  #   container_name: duckdb
+  #   ports:
+  #     - 
+  #   volumes:
+  #     - ./data/duckdb:/workspace
+  #   networks:
+  #     - datatrace-analysis-net
+
+networks:
+  datatrace-analysis-net:
