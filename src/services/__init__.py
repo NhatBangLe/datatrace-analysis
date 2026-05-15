@@ -1,21 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from src.schemas import TraceMetadata
+from src.models.service import Trace, TraceFile
 
 
 class IAnalyticsService(ABC):
 
     @abstractmethod
-    def connect(self, **kwargs):
+    def create_trace(self, data: Trace) -> Optional[Trace]:
         raise NotImplementedError
 
     @abstractmethod
-    def insert_trace_metadata(self, metadata: TraceMetadata):
+    def add_trace_file(self, trace_id: str, data: TraceFile) -> Optional[TraceFile]:
         raise NotImplementedError
 
     @abstractmethod
-    def get_trace_stats(self, trace_id: str, **kwargs) -> Dict[str, Any]:
+    def get_trace_stats(self, trace_id: str, **kwargs) -> Optional[Dict[str, Any]]:
         raise NotImplementedError
 
     @abstractmethod

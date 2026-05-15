@@ -4,7 +4,7 @@ from botocore.exceptions import ClientError
 from src.config import settings
 from src.services import IStorageService
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("S3StorageService")
 
 
 class S3StorageService(IStorageService):
@@ -25,19 +25,23 @@ class S3StorageService(IStorageService):
 
     def upload_file(
         self,
-        file_content: bytes,
-        filename: str,
+        file_content,
+        filename,
         **kwargs,
-    ) -> str:
+    ):
         """
         Uploads a file to the specified S3 bucket.
         Returns the S3 key (filename) if successful, raises an exception otherwise.
         """
         bucket_name = str(kwargs.get("bucket_name") or settings.S3_BUCKET_NAME)
+        mime_type = str(kwargs.get("mime_type") or "application/octet-stream")
 
         try:
             self._s3_client.put_object(
-                Bucket=bucket_name, Key=filename, Body=file_content
+                Bucket=bucket_name,
+                Key=filename,
+                Body=file_content,
+                ContentType=mime_type,
             )
             logger.info(f"Successfully uploaded {filename} to bucket {bucket_name}")
             return filename

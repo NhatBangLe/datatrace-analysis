@@ -1,12 +1,10 @@
-import duckdb
 import logging
-from typing import Dict, Any
 
-from src.config import settings
-from src.schemas import TraceMetadata
+from src.models.database import DBTrace, DBTraceFile
+from src.repositories.duckdb import DuckDBRepository
 from src.services import IAnalyticsService
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("DuckDBAnalyticsService")
 
 
 class DuckDBAnalyticsService(IAnalyticsService):
@@ -14,104 +12,52 @@ class DuckDBAnalyticsService(IAnalyticsService):
     Service to interact with the DuckDB database for metadata storage and analytics.
     """
 
-    def __init__(self):
-        self._db_path: str | None = None
-        self._conn: duckdb.DuckDBPyConnection | None = None
-        self._mode: str | None = None
+    def __init__(self, duckdb_repo: DuckDBRepository):
+        self._duckdb_repo = duckdb_repo
 
-    def connect(self, **kwargs):
-        """
-        Connects to the DuckDB database.
-        """
-        self._db_path = settings.DUCKDB_DATABASE
-        self._mode = "in-memory" if ":memory" in self._db_path else "persistence"
-        self._conn = duckdb.connect(database=self._db_path, read_only=False)
+    def create_trace(self, data):
+        trace = DBTrace(
+            duration=data.duration,
+            vul_error=data.vul_error,
+            description=data.description,
+            target_url=data.target_url,
+            vm_id=data.vm_id,
+            risk_score=data.risk_score,
+        )
+        self._duckdb_repo.insert_trace(trace)
+        logger.debug(f"Inserted trace metadata for ID: {data.id}")
 
-        self._initialize_db()
-        logger.info(
-            f"DuckDBAnalyticsService initialized for database (mode: {self._mode}): {self._db_path}"
+        return data.model_copy(
+            update={
+                "id": trace.id,
+                "created_at": trace.created_at,
+                "updated_at": trace.updated_at,
+            }
         )
 
-    def _initialize_db(self):
-        """
-        Initializes the necessary tables in the DuckDB database if they don't exist.
-        """
-        if self._conn is None:
-            return
-
-        self._conn.execute("""
-            CREATE TABLE IF NOT EXISTS traces (
-                id VARCHAR PRIMARY KEY,
-                file_path VARCHAR NOT NULL,
-                target_url VARCHAR NOT NULL,
-                vm_id VARCHAR NOT NULL,
-                timestamp TIMESTAMP NOT NULL,
-                sha256_hash VARCHAR NOT NULL,
-                risk_score DOUBLE
-            );
-        """)
-        self._conn.execute("""
-            CREATE TABLE IF NOT EXISTS network_events (
-                trace_id VARCHAR,
-                src_ip VARCHAR,
-                dst_ip VARCHAR,
-                port INTEGER,
-                entropy DOUBLE,
-                FOREIGN KEY (trace_id) REFERENCES traces(id)
-            );
-        """)
-        logger.info("DuckDB tables 'traces' and 'network_events' ensured.")
-
-    def insert_trace_metadata(self, metadata: TraceMetadata):
-        """
-        Inserts new trace metadata into the 'traces' table.
-        """
-        if self._conn is None:
-            raise RuntimeError("Database connection not established.")
-
-        self._conn.execute(
-            "INSERT INTO traces (id, file_path, target_url, vm_id, timestamp, sha256_hash, risk_score) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                metadata.id,
-                metadata.file_path,
-                metadata.target_url,
-                metadata.vm_id,
-                metadata.timestamp,
-                metadata.sha256_hash,
-                metadata.risk_score,
-            ),
+    def add_trace_file(self, trace_id, data):
+        trace_file = DBTraceFile(
+            file_path=data.file_path,
+            sha256_hash=data.sha256_hash,
+            mime_type=data.mime_type,
+            trace_id=trace_id,
         )
-        logger.debug(f"Inserted trace metadata for ID: {metadata.id}")
+        try:
+            self._duckdb_repo.insert_trace_file(trace_file)
+            logger.debug(f"Added trace file for trace ID: {trace_id}")
 
-    def get_trace_stats(self, trace_id: str, **kwargs) -> Dict[str, Any]:
-        """
-        Retrieves immediate statistics for a specific trace.
-        This is a placeholder and can be expanded with more complex queries.
-        """
-        if self._conn is None:
-            raise RuntimeError("Database connection not established.")
+            return data.model_copy(
+                update={
+                    "id": trace_file.id,
+                    "created_at": trace_file.created_at,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to insert trace metadata: {e}")
+            return None
 
-        result = self._conn.execute(
-            f"SELECT * FROM traces WHERE id = '{trace_id}'"
-        ).fetch_df()
-        if not result.empty:
-            return result.iloc[0].to_dict()  # type: ignore
-        return {}
+    def get_trace_stats(self, trace_id, **kwargs):
+        return self._duckdb_repo.get_trace_stats(trace_id)
 
-    def get_analysis_summary(self, **kwargs) -> Dict[str, Any]:
-        """
-        Retrieves aggregate statistics across all traces.
-        This is a placeholder and can be expanded with more complex queries.
-        """
-        if self._conn is None:
-            raise RuntimeError("Database connection not established.")
-
-        total_traces_row = self._conn.execute("SELECT COUNT(*) FROM traces").fetchone()
-        total_traces = total_traces_row[0] if total_traces_row else 0
-
-        avg_risk_row = self._conn.execute(
-            "SELECT AVG(risk_score) FROM traces"
-        ).fetchone()
-        avg_risk_score = avg_risk_row[0] if avg_risk_row else None
-
-        return {"total_traces": total_traces, "average_risk_score": avg_risk_score}
+    def get_analysis_summary(self, **kwargs):
+        return self._duckdb_repo.get_analysis_summary()
