@@ -1,6 +1,6 @@
 # DataTrace Analysis (DTA) Project
 
-This project implements the backend for a security data lake, designed to analyze system-level impacts of visiting suspicious URLs. It combines FastAPI for a robust API, SeaweedFS for S3-compatible storage, and DuckDB for fast local analytics.
+This project implements a **Security Data Lake** backend designed to ingest and analyze system-level impacts of suspicious activities (e.g., URL visitation in sandboxes). It leverages a modern high-performance stack: FastAPI for data ingestion, SeaweedFS for distributed object storage, and DuckDB combined with Pandas for rapid analytical processing.
 
 ## Architecture Overview
 
@@ -30,15 +30,15 @@ Run SeaweedFS with master, volume, and S3 gateway. For example:
 
 ```bash
 docker run -d --name seaweedfs -p 9333:9333 -p 8333:8333 -p 8080:8080 chrislusf/seaweedfs:latest \
-    master -defaultReplication=1 -volumeSizeLimitMB=1000 \
-    & docker run -d --name seaweedfs-volume --network container:seaweedfs chrislusf/seaweedfs:latest volume \
-    & docker run -d --name seaweedfs-s3 --network container:seaweedfs -p 8333:8333 chrislusf/seaweedfs:latest s3
+    master -defaultReplication=1 -volumeSizeLimitMB=1000
+docker run -d --name seaweedfs-volume --network container:seaweedfs chrislusf/seaweedfs:latest volume
+docker run -d --name seaweedfs-s3 --network container:seaweedfs -p 8333:8333 chrislusf/seaweedfs:latest s3
 ```
 
 Or check `docker-compose.yml` for more details.
 
 
-Ensure a bucket named `datatrace-raw` is created (e.g., via `s3cmd` or `mc` client, or it will be created on first upload by `boto3`).
+Ensure a bucket named `datatrace-raw` (configures via `.env`) is created (e.g., via `s3cmd` or `mc` client, or it will be created on first upload by `boto3`).
 
 ### 2. Python Environment
 
