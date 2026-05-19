@@ -1,7 +1,10 @@
 import logging.config
+import os
 
 
 def setup_logging():
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+
     LOGGING_CONFIG = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -24,7 +27,7 @@ def setup_logging():
         },
         "root": {
             "handlers": ["default"],
-            "level": "INFO",
+            "level": log_level,
         },
     }
     logging.config.dictConfig(LOGGING_CONFIG)

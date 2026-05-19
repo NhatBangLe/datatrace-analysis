@@ -87,7 +87,10 @@ async def upload_trace_file(
 
         # 3. Storage
         s3_key = s3_service.upload_file(
-            file_content=file_content, filename=filename_in_s3, mime_type=mime_type
+            file_content=file_content,
+            filename=filename_in_s3,
+            mime_type=mime_type,
+            folder=trace_id,
         )
 
         # 4. Indexing
@@ -103,10 +106,7 @@ async def upload_trace_file(
                 detail="Failed to save trace file.",
             )
 
-        return {
-            "message": "Trace uploaded and indexed successfully",
-            "s3_key": s3_key,
-        }
+        return s3_key
     except HTTPException as e:
         raise e
     except Exception as e:

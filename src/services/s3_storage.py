@@ -35,16 +35,18 @@ class S3StorageService(IStorageService):
         """
         bucket_name = str(kwargs.get("bucket_name") or settings.S3_BUCKET_NAME)
         mime_type = str(kwargs.get("mime_type") or "application/octet-stream")
+        folder = str(kwargs.get("folder")) if kwargs.get("folder") else None
+        s3_key = f"{f'{folder}/' if folder else ''}{filename}"
 
         try:
             self._s3_client.put_object(
                 Bucket=bucket_name,
-                Key=filename,
+                Key=s3_key,
                 Body=file_content,
                 ContentType=mime_type,
             )
-            logger.info(f"Successfully uploaded {filename} to bucket {bucket_name}")
-            return filename
+            logger.debug(f"Successfully uploaded {s3_key} to bucket {bucket_name}")
+            return s3_key
         except ClientError as e:
-            logger.error(f"Failed to upload {filename} to S3 bucket {bucket_name}: {e}")
-            raise
+            logger.error(f"Failed to upload {s3_key} to S3 bucket {bucket_name}: {e}")
+            raise RuntimeError
