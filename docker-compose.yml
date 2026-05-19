@@ -10,8 +10,6 @@ services:
       - "7333:7333" # WebDAV
       - "23646:23646" # Admin UI
     environment:
-      - IP_BIND=0.0.0.0
-
       # Authentication
       - AWS_ACCESS_KEY_ID=any
       - AWS_SECRET_ACCESS_KEY=any
@@ -20,7 +18,7 @@ services:
     networks:
       - datatrace-analysis-net
     entrypoint: weed
-    command: mini
+    command: mini -dir=/data -ip.bind=0.0.0.0
   
   datatrace:
     image: datatrace-api:latest
