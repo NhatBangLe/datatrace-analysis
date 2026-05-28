@@ -19,6 +19,19 @@ class S3StorageService(IStorageService):
             aws_access_key_id=settings.S3_ACCESS_KEY_ID,
             aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY,
         )
+        
+        # Ensure the default bucket exists
+        try:
+            self._s3_client.head_bucket(Bucket=settings.S3_BUCKET_NAME)
+            logger.debug(f"Bucket {settings.S3_BUCKET_NAME} exists.")
+        except ClientError:
+            logger.info(f"Bucket {settings.S3_BUCKET_NAME} does not exist. Creating it...")
+            try:
+                self._s3_client.create_bucket(Bucket=settings.S3_BUCKET_NAME)
+                logger.info(f"Successfully created bucket {settings.S3_BUCKET_NAME}.")
+            except ClientError as e:
+                logger.error(f"Failed to create bucket {settings.S3_BUCKET_NAME}: {e}")
+
         logger.info(
             f"S3StorageService initialized for endpoint: {settings.SEAWEEDFS_ENDPOINT_URL}"
         )
