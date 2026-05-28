@@ -22,6 +22,26 @@ class IAnalyticsService(ABC):
     def get_analysis_summary(self, **kwargs) -> Dict[str, Any]:
         raise NotImplementedError
 
+    @abstractmethod
+    def get_filtered_traces(self, **kwargs) -> list[Dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_filtered_files(self, **kwargs) -> list[Dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_stats_by_domain(self, **kwargs) -> list[Dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_stats_by_vm(self, **kwargs) -> list[Dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_trends(self, interval: str = 'day', **kwargs) -> list[Dict[str, Any]]:
+        raise NotImplementedError
+
 
 class IStorageService(ABC):
 

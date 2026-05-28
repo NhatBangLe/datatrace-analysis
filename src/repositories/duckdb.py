@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Dict, Optional
+import os
+from typing import Any, Dict, Optional, List
 import duckdb
 
 from src.config import settings
@@ -24,6 +25,12 @@ class DuckDBRepository:
         """
         self._db_path = settings.DUCKDB_DATABASE
         self._mode = "in-memory" if ":memory" in self._db_path else "persistence"
+        
+        if self._mode == "persistence":
+            db_dir = os.path.dirname(self._db_path)
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
+                
         self._conn = duckdb.connect(database=self._db_path, read_only=False)
 
     def initialize_db(self):
@@ -137,3 +144,166 @@ class DuckDBRepository:
         avg_risk_score = avg_risk_row[0] if avg_risk_row else None
 
         return {"total_traces": total_traces, "average_risk_score": avg_risk_score}
+
+    def get_filtered_traces(
+        self,
+        target_url: Optional[str] = None,
+        vm_id: Optional[str] = None,
+        min_risk_score: Optional[float] = None,
+        max_risk_score: Optional[float] = None,
+        has_error: Optional[bool] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> List[Dict[str, Any]]:
+        if self._conn is None:
+            raise RuntimeError("Database connection not established.")
+
+        query = "SELECT * FROM traces WHERE 1=1"
+        params: List[Any] = []
+
+        if target_url:
+            query += " AND target_url LIKE ?"
+            params.append(f"%{target_url}%")
+        if vm_id:
+            query += " AND vm_id = ?"
+            params.append(vm_id)
+        if min_risk_score is not None:
+            query += " AND risk_score >= ?"
+            params.append(min_risk_score)
+        if max_risk_score is not None:
+            query += " AND risk_score <= ?"
+            params.append(max_risk_score)
+        if has_error is not None:
+            if has_error:
+                query += " AND vul_error IS NOT NULL AND vul_error != ''"
+            else:
+                query += " AND (vul_error IS NULL OR vul_error = '')"
+        if start_date:
+            query += " AND created_at >= CAST(? AS TIMESTAMP)"
+            params.append(start_date)
+        if end_date:
+            query += " AND created_at <= CAST(? AS TIMESTAMP)"
+            params.append(end_date)
+
+        allowed_sort_cols = ["created_at", "risk_score", "duration"]
+        if sort_by in allowed_sort_cols:
+            order = "ASC" if sort_order.lower() == "asc" else "DESC"
+            query += f" ORDER BY {sort_by} {order}"
+        else:
+            query += " ORDER BY created_at DESC"
+
+        query += f" LIMIT {limit} OFFSET {offset}"
+
+        result = self._conn.execute(query, params).fetch_df()
+        
+        if result.empty:
+            return []
+            
+        return result.to_dict(orient="records")  # type: ignore
+
+    def get_filtered_files(
+        self,
+        sha256_hash: Optional[str] = None,
+        mime_type: Optional[str] = None,
+        trace_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        if self._conn is None:
+            raise RuntimeError("Database connection not established.")
+
+        query = """
+            SELECT tf.*, t.target_url, t.vm_id 
+            FROM trace_files tf
+            JOIN traces t ON tf.trace_id = t.id
+            WHERE 1=1
+        """
+        params: List[Any] = []
+
+        if sha256_hash:
+            query += " AND tf.sha256_hash = ?"
+            params.append(sha256_hash)
+        if mime_type:
+            query += " AND tf.mime_type = ?"
+            params.append(mime_type)
+        if trace_id:
+            query += " AND tf.trace_id = ?"
+            params.append(trace_id)
+
+        query += f" ORDER BY tf.created_at DESC LIMIT {limit} OFFSET {offset}"
+
+        result = self._conn.execute(query, params).fetch_df()
+        
+        if result.empty:
+            return []
+            
+        return result.to_dict(orient="records")  # type: ignore
+
+    def get_stats_by_domain(self) -> List[Dict[str, Any]]:
+        if self._conn is None:
+            raise RuntimeError("Database connection not established.")
+
+        query = """
+            SELECT 
+                regexp_extract(target_url, '^(?:https?://)?([^:/]+)', 1) AS domain,
+                COUNT(*) AS trace_count,
+                AVG(risk_score) AS average_risk_score,
+                COUNT(vul_error) AS error_count
+            FROM traces 
+            GROUP BY domain 
+            ORDER BY trace_count DESC
+        """
+        result = self._conn.execute(query).fetch_df()
+        
+        if result.empty:
+            return []
+            
+        return result.to_dict(orient="records")  # type: ignore
+
+    def get_stats_by_vm(self) -> List[Dict[str, Any]]:
+        if self._conn is None:
+            raise RuntimeError("Database connection not established.")
+
+        query = """
+            SELECT 
+                vm_id,
+                COUNT(*) AS trace_count,
+                AVG(risk_score) AS average_risk_score,
+                AVG(duration) AS average_duration,
+                COUNT(vul_error) AS error_count
+            FROM traces 
+            GROUP BY vm_id 
+            ORDER BY trace_count DESC
+        """
+        result = self._conn.execute(query).fetch_df()
+        
+        if result.empty:
+            return []
+            
+        return result.to_dict(orient="records")  # type: ignore
+
+    def get_trends(self, interval: str = 'day') -> List[Dict[str, Any]]:
+        if self._conn is None:
+            raise RuntimeError("Database connection not established.")
+
+        query = f"""
+            SELECT 
+                date_trunc('{interval}', created_at) AS interval_time,
+                COUNT(*) AS trace_count,
+                AVG(risk_score) AS average_risk_score
+            FROM traces 
+            GROUP BY interval_time 
+            ORDER BY interval_time ASC
+        """
+        result = self._conn.execute(query).fetch_df()
+        
+        if result.empty:
+            return []
+            
+        # Convert timestamp to string for JSON serialization compatibility
+        result['interval_time'] = result['interval_time'].astype(str)
+        return result.to_dict(orient="records")  # type: ignore

@@ -61,3 +61,18 @@ class DuckDBAnalyticsService(IAnalyticsService):
 
     def get_analysis_summary(self, **kwargs):
         return self._duckdb_repo.get_analysis_summary()
+
+    def get_filtered_traces(self, **kwargs):
+        return self._duckdb_repo.get_filtered_traces(**kwargs)
+
+    def get_filtered_files(self, **kwargs):
+        return self._duckdb_repo.get_filtered_files(**kwargs)
+
+    def get_stats_by_domain(self, **kwargs):
+        return self._duckdb_repo.get_stats_by_domain()
+
+    def get_stats_by_vm(self, **kwargs):
+        return self._duckdb_repo.get_stats_by_vm()
+
+    def get_trends(self, interval: str = 'day', **kwargs):
+        return self._duckdb_repo.get_trends(interval=interval)
