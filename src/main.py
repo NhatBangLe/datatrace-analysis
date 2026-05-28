@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
 from src.helpers import setup_logging
 from src.repositories.duckdb import DuckDBRepository
@@ -32,6 +33,14 @@ app = FastAPI(
     version=settings.APP_VERSION,
     description="API for DataTrace Analysis (DTA) project, managing forensic data ingestion and indexing.",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(trace_router)

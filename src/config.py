@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     # FastAPI Application Settings
     APP_NAME: str = "DataTrace Analysis API"
     APP_VERSION: str = "0.1.0"
+    ALLOWED_ORIGINS: list[str] = ["*"]
 
     # SeaweedFS S3 Gateway Settings
     SEAWEEDFS_ENDPOINT_URL: str = "http://localhost:8333"
