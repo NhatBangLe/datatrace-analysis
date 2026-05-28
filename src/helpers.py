@@ -1,5 +1,30 @@
 import logging.config
 import os
+import mimetypes
+
+# Register custom MIME types for security forensics formats
+mimetypes.add_type("application/vnd.tcpdump.pcap", ".pcap")
+mimetypes.add_type("application/x-pcapng", ".pcapng")
+mimetypes.add_type("application/x-microsoft-procmon-pml", ".pml")
+mimetypes.add_type("application/x-ms-evtx", ".evtx")
+
+
+def guess_mime_type(filename: str, client_mime: str | None = None) -> str:
+    """
+    Attempts to guess the MIME type of a file based on its filename extension using
+    the registered types, falling back to the client-provided MIME type if specified,
+    and finally defaulting to application/octet-stream.
+    """
+    if filename:
+        guessed_type, _ = mimetypes.guess_type(filename)
+        if guessed_type:
+            return guessed_type
+
+    if client_mime and client_mime != "application/octet-stream":
+        return client_mime
+
+    return "application/octet-stream"
+
 
 
 def setup_logging():

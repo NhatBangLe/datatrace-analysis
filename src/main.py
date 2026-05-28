@@ -4,24 +4,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
 from src.helpers import setup_logging
-from src.repositories.duckdb import DuckDBRepository
-from src.services.s3_storage import S3StorageService
-from src.services.duckdb_analytics import DuckDBAnalyticsService
 from src.routers.trace import router as trace_router
 from src.routers.analysis import router as analysis_router
-
-# Initialize dependencies
-duckdb_repo = DuckDBRepository()
-
-s3_service = S3StorageService()
-analytics_service = DuckDBAnalyticsService(duckdb_repo=duckdb_repo)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize logging
     setup_logging()
 
+    from src.dependencies import get_duckdb_repository
+    duckdb_repo = get_duckdb_repository()
     duckdb_repo.connect()
     duckdb_repo.initialize_db()
 

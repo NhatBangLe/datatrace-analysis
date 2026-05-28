@@ -1,7 +1,7 @@
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, Depends
 from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_400_BAD_REQUEST,
@@ -17,6 +17,8 @@ from src.models.analysis import (
     VMStatsResponse,
     TrendStatsResponse,
 )
+from src.dependencies import get_analytics_service
+from src.services.duckdb_analytics import DuckDBAnalyticsService
 import pandas as pd
 
 router = APIRouter(
@@ -32,18 +34,20 @@ router = APIRouter(
 
 
 @router.get("/summary", response_model=AnalysisSummaryResponse)
-async def get_analysis_summary():
+async def get_analysis_summary(
+    analytics_service: DuckDBAnalyticsService = Depends(get_analytics_service)
+):
     """Returns aggregate statistics across all traces."""
     try:
-        from src.main import analytics_service
-
         summary = analytics_service.get_analysis_summary()
         return summary
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logging.error(f"Error getting analysis summary: {e}")
+        logging.error(f"Error getting analysis summary: {e}", exc_info=True)
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process analysis summary: {e}",
+            detail="Failed to retrieve analysis summary due to an internal error.",
         )
 
 @router.get("/traces", response_model=List[TraceResponse])
@@ -59,10 +63,10 @@ async def get_traces(
     offset: int = Query(0, ge=0),
     sort_by: str = Query("created_at", description="Sort field: created_at, risk_score, duration"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
+    analytics_service: DuckDBAnalyticsService = Depends(get_analytics_service),
 ):
     """Retrieve and filter traces."""
     try:
-        from src.main import analytics_service
         traces = analytics_service.get_filtered_traces(
             target_url=target_url,
             vm_id=vm_id,
@@ -77,11 +81,13 @@ async def get_traces(
             sort_order=sort_order,
         )
         return traces
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logging.error(f"Error getting traces: {e}")
+        logging.error(f"Error getting traces: {e}", exc_info=True)
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve traces: {e}",
+            detail="Failed to retrieve traces due to an internal error.",
         )
 
 @router.get("/files", response_model=List[FileSearchResponse])
@@ -91,10 +97,10 @@ async def get_files(
     trace_id: Optional[str] = Query(None, description="Filter by Trace ID"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    analytics_service: DuckDBAnalyticsService = Depends(get_analytics_service),
 ):
     """Search for captured files and their trace context."""
     try:
-        from src.main import analytics_service
         files = analytics_service.get_filtered_files(
             sha256_hash=sha256_hash,
             mime_type=mime_type,
@@ -103,52 +109,62 @@ async def get_files(
             offset=offset,
         )
         return files
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logging.error(f"Error getting files: {e}")
+        logging.error(f"Error getting files: {e}", exc_info=True)
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve files: {e}",
+            detail="Failed to retrieve files due to an internal error.",
         )
 
 @router.get("/stats/by-domain", response_model=List[DomainStatsResponse])
-async def get_stats_by_domain():
+async def get_stats_by_domain(
+    analytics_service: DuckDBAnalyticsService = Depends(get_analytics_service)
+):
     """Aggregate trace statistics grouped by domain."""
     try:
-        from src.main import analytics_service
         return analytics_service.get_stats_by_domain()
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logging.error(f"Error getting domain stats: {e}")
+        logging.error(f"Error getting domain stats: {e}", exc_info=True)
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process domain stats: {e}",
+            detail="Failed to retrieve domain statistics due to an internal error.",
         )
 
 @router.get("/stats/by-vm", response_model=List[VMStatsResponse])
-async def get_stats_by_vm():
+async def get_stats_by_vm(
+    analytics_service: DuckDBAnalyticsService = Depends(get_analytics_service)
+):
     """Aggregate trace statistics grouped by VM."""
     try:
-        from src.main import analytics_service
         return analytics_service.get_stats_by_vm()
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logging.error(f"Error getting VM stats: {e}")
+        logging.error(f"Error getting VM stats: {e}", exc_info=True)
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process VM stats: {e}",
+            detail="Failed to retrieve VM statistics due to an internal error.",
         )
 
 @router.get("/trends", response_model=List[TrendStatsResponse])
 async def get_trends(
-    interval: str = Query("day", description="Aggregation interval: hour, day, week")
+    interval: str = Query("day", description="Aggregation interval: hour, day, week"),
+    analytics_service: DuckDBAnalyticsService = Depends(get_analytics_service)
 ):
     """Time-series activity trends for traces."""
     try:
-        from src.main import analytics_service
         return analytics_service.get_trends(interval=interval)
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logging.error(f"Error getting trends: {e}")
+        logging.error(f"Error getting trends: {e}", exc_info=True)
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process trends: {e}",
+            detail="Failed to retrieve trends due to an internal error.",
         )
 
 @router.get("/export")
@@ -156,10 +172,10 @@ async def export_csv(
     target_url: Optional[str] = Query(None),
     vm_id: Optional[str] = Query(None),
     min_risk_score: Optional[float] = Query(None),
+    analytics_service: DuckDBAnalyticsService = Depends(get_analytics_service)
 ):
     """Export filtered traces as a CSV file."""
     try:
-        from src.main import analytics_service
         traces = analytics_service.get_filtered_traces(
             target_url=target_url,
             vm_id=vm_id,
@@ -177,9 +193,11 @@ async def export_csv(
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=traces_export.csv"}
         )
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logging.error(f"Error exporting traces: {e}")
+        logging.error(f"Error exporting traces: {e}", exc_info=True)
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to export traces: {e}",
+            detail="Failed to export traces due to an internal error.",
         )

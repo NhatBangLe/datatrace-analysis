@@ -1,10 +1,10 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AnyHttpUrl
 
 
 class CreateTraceRequest(BaseModel):
-    target_url: str = Field(description="The URL that was visited.")
+    target_url: AnyHttpUrl = Field(description="The URL that was visited.")
     vm_id: str = Field(
         description="Identifier of the VM.", min_length=1, max_length=100
     )

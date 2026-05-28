@@ -52,11 +52,16 @@ class S3StorageService(IStorageService):
         s3_key = f"{f'{folder}/' if folder else ''}{filename}"
 
         try:
+            extra_args = {}
+            if "content_length" in kwargs:
+                extra_args["ContentLength"] = kwargs["content_length"]
+
             self._s3_client.put_object(
                 Bucket=bucket_name,
                 Key=s3_key,
                 Body=file_content,
                 ContentType=mime_type,
+                **extra_args,
             )
             logger.debug(f"Successfully uploaded {s3_key} to bucket {bucket_name}")
             return s3_key
